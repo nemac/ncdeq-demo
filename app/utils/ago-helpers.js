@@ -47,11 +47,12 @@ function get_AllChartDataLowerLevel_byID(hucid,geogLevel){
      id = hucid.substring(0,8);
    }
    var query_URL = '/RDRBP/FeatureServer/3/query?where='+
-                   'ID+like+%27' + id + '%25%27+and+geography_level%3D'+ level +
+//                   'ID+like+%27' + id + '%25%27+and+geography_level%3D'+ level +
+                   'ID+like+%27' + id + '%25%27' +
                    '&objectIds='+
                    '&time='+
                    '&resultType=none'+
-                   '&outFields=chart_level%2C+chart_label%2C+chart_value%2C+chart_description%2C+chart_type%2C+chart_level_label'+
+                   '&outFields=OBJECT_ID%2CID%2Cgeography_match_id%2Cchart_id%2Cchart_matchid%2Cgeography_level%2Cchart_level%2C+chart_label%2C+chart_value%2C+chart_description%2C+chart_type%2C+chart_level_label'+
                    '&returnIdsOnly=false'+
                    '&returnCountOnly=false'+
                    '&returnDistinctValues=true'+
@@ -104,7 +105,7 @@ function testit(hucid){
                       '&objectIds='+
                       '&time='+
                       '&resultType=none'+
-                      '&outFields=chart_id%2C+chart_matchid%2Cchart_type%2Cchart_level%2Cchart_description%2Cchart_value'+
+                      '&outFields=OBJECT_ID%2CID%2Cgeography_match_id%2Cgeography_level%2Cchart_id%2C+chart_matchid%2Cchart_type%2Cchart_level%2Cchart_level_label%2Cchart_description%2Cchart_value'+
                       '&returnIdsOnly=false'+
                       '&returnCountOnly=false'+
                       '&returnDistinctValues=true'+
@@ -127,7 +128,7 @@ function testit(hucid){
                       '&objectIds='+
                       '&time='+
                       '&resultType=none'+
-                      '&outFields=chart_id%2C+chart_matchid%2Cchart_type%2Cchart_level%2Cchart_description%2Cchart_value'+
+                      '&outFields=OBJECTID%2Cchart_id%2C+chart_matchid%2Cchart_type%2Cchart_level%2Cchart_description%2Cchart_value'+
                       '&returnIdsOnly=false'+
                       '&returnCountOnly=false'+
                       '&returnDistinctValues=true'+
