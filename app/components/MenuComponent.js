@@ -1,5 +1,8 @@
 var React = require('react');
+import ReactDOM from 'react-dom';
 var MenuItemComponent = require('../components/MenuItemComponent');
+import Treemap from '../react-treemaps/src/components/treemap.jsx';
+var {makeTreeFromHuc12Data, makeTreeFromHuc8Data} = require('../react-treemaps/src/core.js');
 
 var agoHelpers = require('../utils/ago-helpers');
 
@@ -103,31 +106,52 @@ var MenuComponent = React.createClass({
     this.updateFilterState(level,e.target.value)
 
     //console.log(level);
-    if(level === 'HUC12'){
+    if (level === 'HUC12') {
       agoHelpers.get_ChartData_byID(e.target.value)
-        .then(function(chartData){
+        .then(function (chartData) {
           //this not in state so if we re-render the the chart area it will no longer be available
-          $('#Compare_chart').html(JSON.stringify(chartData))
+          var mountingPoint = document.getElementById('Compare_chart');
+          var props = {
+            root: makeTreeFromHuc12Data(chartData.features)
+          }
+//          console.log("HEYYYYYYY")
+//          console.log(props.root)
+//          console.log(chartData)
+
+//          $('#Compare_chart').html(JSON.stringify(chartData))
+
+          ReactDOM.render(
+            <Treemap {...props}/>,
+            mountingPoint
+          );
 
           //this state does not get passed to parents so it will need to managed by redux
           self.setState(chartData)
           return chartData
         }.bind(this))
-    }
-
-
-
+    } else {
       agoHelpers.get_AllChartDataLowerLevel_byID(e.target.value,level)
         .then(function(chartData){
-          //this not in state so if we re-render the the chart area it will no longer be available
-          $("#HUCs_chart").html(JSON.stringify(chartData))
-        //  console.log({chartData})
+          console.log('YOOOOOO')
+          console.log(chartData)
+          if (chartData && chartData.features) {
+            var mountingPoint = document.getElementById('HUCs_chart');
+            var props = {
+              root: makeTreeFromHuc8Data(chartData.features)
+            }
+            console.log(props);
+
+            ReactDOM.render(
+              <Treemap {...props}/>,
+              mountingPoint
+            );
+          }
 
           //this state does not get passed to parents so it will need to managed by redux
           self.setState({chartData})
           return chartData
         }.bind(this))
-
+    }
   },
   handleMenuClick: function(val,e) {
     //reset menu
