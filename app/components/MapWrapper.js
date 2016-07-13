@@ -1,25 +1,20 @@
 var React = require('react');
-var MapComponent = require('../components/MapComponent')
+import MapContainer from '../containers/MapContainer'
+
+//app constants
+import {
+  ROW_PADDING
+} from '../constants/appConstants'
 
 var PropTypes = React.PropTypes;
 
 var MapWrapper = React.createClass({
   propTypes: {
-    latitude: PropTypes.number.isRequired,
-    longitude: PropTypes.number.isRequired,
-    zoom: PropTypes.number.isRequired,
-    mapHeight: PropTypes.number.isRequired,
-    handleMapClick: PropTypes.func.isRequired,
-    handleMapMoveEnd: PropTypes.func.isRequired,
-    HandleMapZoomEnd: PropTypes.func.isRequired,
-    rowPadding: PropTypes.number
   },
   render: function() {
-    var pad = this.props.rowPadding ? 1 : this.props.rowPadding;
+    var pad = this.props.rowPadding ? ROW_PADDING : this.props.rowPadding;
     return (
-      <div className="twelve wide column" style={{padding:pad + 'px',height:this.props.mapHeight + 'px'}}>
-        <MapComponent HandleMapZoomEnd={this.props.HandleMapZoomEnd} handleMapMoveEnd={this.props.handleMapMoveEnd} zoom={this.props.zoom} latitude={this.props.latitude} longitude={this.props.longitude} handleMapClick={this.props.handleMapClick} />
-      </div>
+        <MapContainer />
     );
   }
 });

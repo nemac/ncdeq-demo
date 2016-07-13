@@ -1,97 +1,78 @@
 var React = require('react');
-import ReactDOM from 'react-dom';
 var MenuItemComponent = require('../components/MenuItemComponent');
-import Treemap from '../react-treemaps/src/components/treemap.jsx';
-var {makeTreeFromHuc12Data, makeTreeFromHuc8Data} = require('../react-treemaps/src/core.js');
-
-var agoHelpers = require('../utils/ago-helpers');
-
 var PropTypes = React.PropTypes;
+//  general functions and  helpers.  reuse functions
+import { getNextLevelName, getCategoryName, getAGOGeographyLabel} from '../utils/helpers';
 
 var MenuComponent = React.createClass({
-  propTypes: {
-    handleSearchChange: PropTypes.func.isRequired,
-    latitude: PropTypes.number.isRequired,
-    longitude: PropTypes.number.isRequired,
-    zoom: PropTypes.number.isRequired
+  handleChartButtonClick: function(){
+
+    //toggle chart visibility with button click
+    this.props.update_ChartVisiblity();
+    this.props.update_MapHeight();
+
   },
   componentDidMount: function() {
     //var input = document.getElementById('searchTextField');
     //var options = {componentRestrictions: {country: 'us'}};
     //new google.maps.places.Autocomplete(input, options);
-    agoHelpers.get_MenuList()
-      .then(function(RiverBasinData){
-        return this.setState ({RiverBasinData})
-      }.bind(this))
+
+    this.props.get_MenuList();
 
   },
-  getLevel: function(){
-    var st = this.state
-
-    var activeTab = Object.keys(st).filter(function (key) {
-        return  st[key]['active'] === true;
-    });
-
-    return activeTab[0]
-  },
-  getNextLevel: function(level){
-    //next level is hardcoded need to make this data driven
-    switch (level) {
-      case 'River Basins':
-        return 'Cataloging Units';
-        break;
-      case 'Cataloging Units':
-        return 'HUC12';
-        break;
-      case 'HUC12':
-        return '';
-        break;
-      default:
-        return '';
-    }
-
-  },
-  getStateObject: function(){
-
-
-    var obj = {};
-
-    var blankListing = {"id": "            ","NAME": "            ","VALUE": "            ","MAIN": "            ","SUB": "            "};
-
-    if(!this.state){
-      var items = [ {name:'River Basins',lists:[blankListing]},{name:'Cataloging Units',lists:[blankListing]},{name:'HUC12',lists:[blankListing]} ];
-    }else{
-      var items = this.state.RiverBasinData;
-    }
-
-    items.map(function(item) {
-      obj[ item.name ] = {
-        'active':false,
-        'filter': !this.state ? '' : !this.state[item.name] ? '':  this.state[item.name].filter };
-    },this)
-
-     return obj
-  },
-  getInitialState: function () {
-    return this.getStateObject();
-  },
-  resetMenus: function(){
-    //set all to false
-    this.setState(this.getStateObject())
-  },
-  updateFilterState(level,value){
-
-    var nextLevel = this.getNextLevel(level);
-    //set filter and active state for next level(s)
-    if(nextLevel){
-      this.setState({
-        [nextLevel]:{
-          'active': false,
-          'filter': value
-        }
+  getDefaultMenu: function(level){
+    //filter the levels to get the active tab
+    //check if DefaultMenuLists exsists
+    if (this.props.DefaultMenuLists){
+      const DefaultMenuObject = this.props.DefaultMenuLists.filter( key =>{
+        return key.name === level;
       })
 
-      //kind of hacky
+      //set default menus for level
+      let DefaultMenu = [];
+      if (DefaultMenuObject.length > 0){
+        //get the menu only need the first in array since that is all that SHOULD exsist
+        DefaultMenu = DefaultMenuObject[0].lists;
+      }
+
+      return DefaultMenu
+    } else {
+      return null
+    }
+  },
+  checkList: function(list){
+    if (list){
+      return  this.props.DefaultMenuLists;
+    }
+  },
+
+  getLevel: function(){
+
+    //filter the levels to get the active tab
+    const ActiveTabObject = this.props.geography_levels.filter( key =>{
+      return key.active === true;
+    })
+
+    //set default active tab - as Highest level
+    let activeTab = 'River Basins'
+    if (ActiveTabObject.length > 0){
+      //get the active tab and convert the name to the name used in the app.
+      //  this will eventually be driven by config or data....???
+      activeTab = getCategoryName(ActiveTabObject[0].geography_label);
+    }
+
+    return activeTab
+  },
+
+
+  updateFilterState(level,value){
+
+    var nextLevel = getNextLevelName(level);
+
+    //set filter and active state for next level(s)
+    if(nextLevel){
+
+      //kind of hacky--how to do this in redux?
       $('#search-select-'+nextLevel.replace(' ','_')).dropdown('set text','Choose a ' + nextLevel)
 
       //recursive call to update all level filters
@@ -101,83 +82,62 @@ var MenuComponent = React.createClass({
     }
   },
   menuChange: function(e){
-    var self = this;
+
     var level = this.getLevel();
-    this.updateFilterState(level,e.target.value)
+    this.updateFilterState(level,e.target.value);
 
-    //console.log(level);
-    if (level === 'HUC12') {
-      agoHelpers.get_ChartData_byID(e.target.value)
-        .then(function (chartData) {
-          //this not in state so if we re-render the the chart area it will no longer be available
-          var mountingPoint = document.getElementById('Compare_chart');
-          var props = {
-            root: makeTreeFromHuc12Data(chartData.features)
-          }
-//          console.log("HEYYYYYYY")
-//          console.log(props.root)
-//          console.log(chartData)
+    this.props.get_ChartData(e.target.value,level)
+    this.props.change_geographyLevelFilter(e.target.value,level)
 
-//          $('#Compare_chart').html(JSON.stringify(chartData))
-
-          ReactDOM.render(
-            <Treemap {...props}/>,
-            mountingPoint
-          );
-
-          //this state does not get passed to parents so it will need to managed by redux
-          self.setState(chartData)
-          return chartData
-        }.bind(this))
-    } else {
-      agoHelpers.get_AllChartDataLowerLevel_byID(e.target.value,level)
-        .then(function(chartData){
-          console.log('YOOOOOO')
-          console.log(chartData)
-          if (chartData && chartData.features) {
-            var mountingPoint = document.getElementById('HUCs_chart');
-            var props = {
-              root: makeTreeFromHuc8Data(chartData.features)
-            }
-            console.log(props);
-
-            ReactDOM.render(
-              <Treemap {...props}/>,
-              mountingPoint
-            );
-          }
-
-          //this state does not get passed to parents so it will need to managed by redux
-          self.setState({chartData})
-          return chartData
-        }.bind(this))
-    }
   },
   handleMenuClick: function(val,e) {
-    //reset menu
-    this.resetMenus();
-    //change state to active for clicked menu
-    this.setState({
-      [val]:{'active': true,
-        'filter': (!this.state[val] ? '' : this.state[val].filter)
-      }
-    })
+
+    //get current geography level
+    var level = this.getLevel();
+
+    //set current geography level in redux state store
+    this.props.change_geographyLevelActive(val);
 
   },
   getActive: function(val){
-    if (this.state[val]) {
-      return  (this.state[val].active ? 'active item' : 'item')
-    }else{
-      return ''
+
+    const level = getAGOGeographyLabel(val)
+    //can I make this a generic function since I am using same logic over.
+    //filter the levels to get the current passed level
+    const FilterObject = this.props.geography_levels.filter( key =>{
+      return key.geography_label === level;
+    })
+
+    //set default
+    let isActive = false;
+    if (FilterObject.length > 0){
+      //get active boolen
+      isActive = FilterObject[0].active;
     }
+
+    //return active setting
+    return (isActive ? 'active item' : 'item');
+
   },
   getFilter: function(val){
-    if (this.state[val]) {
-      return  (this.state[val].filter)
-    } else {
-      return ''
+    const level = getAGOGeographyLabel(val)
+
+    //filter the levels to get the current passed level
+    const FilterObject = this.props.geography_levels.filter( key =>{
+      return key.geography_label === level;
+    })
+
+    //set default
+    let theFilter = ''
+    if (FilterObject.length > 0){
+      //get the Filter
+      theFilter = FilterObject[0].filter;
     }
+
+    return theFilter;
+
   },
+  //{this.props.charts.chart_visibility ? "Show Charts" : "Hide Charts" }
   render: function() {
     return (
       <div className="ui pointing menu"  >
@@ -185,10 +145,20 @@ var MenuComponent = React.createClass({
           &nbsp;
         </div>
 
-          { this.state.RiverBasinData &&
-            this.state.RiverBasinData.map(function(item) {
+          { this.props.geography_levels &&
+            this.props.geography_levels.map(function(item) {
+              const name = getCategoryName(item.geography_label)
+
+              //get filtered menu list
+              let menuList = item.filtered_menu_list;
+
+              //if filtered list is not set get the default menu list
+              if (menuList.length === 0){
+                menuList = this.getDefaultMenu(name);
+              }
+
               return (
-                <MenuItemComponent key={item.name} name={item.name} lists={item.lists} activeValue={item.activeValue} getFilter={this.getFilter} getActive={this.getActive} handleMenuClick={this.handleMenuClick} menuChange={this.menuChange}/>
+                <MenuItemComponent key={name} name={name} lists={menuList}  getFilter={this.getFilter} getActive={this.getActive} handleMenuClick={this.handleMenuClick} menuChange={this.menuChange}/>
               )
             }.bind(this))
           }
@@ -209,7 +179,7 @@ var MenuComponent = React.createClass({
           </a>
 
         <div className="header item" >
-          &nbsp;
+          <button className="ui button" onClick={this.handleChartButtonClick.bind(null,this)}>{!this.props.charts.chart_visibility ? "Show Charts" : "Hide Charts" }</button>
         </div>
         <div className="left menu">
           <div className="item">
