@@ -1,7 +1,7 @@
 import React from 'react';
 import App from '../containers/App';
 import MainComponent from '../components/MainComponent';
- 
+
 import { Router, Route, IndexRoute, browserHistory, hashHistory} from 'react-router';
 
 import { Provider } from 'react-redux';

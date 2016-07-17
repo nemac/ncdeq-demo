@@ -6,37 +6,138 @@ import ESRITileMapLayer from '../components/ESRITiledMapLayer'
 import {
   MAP_HEIGHT,
   DEF_PAD,
-} from '../constants/appConstants'
+} from '../constants/appConstants';
+
+import { HUC12_MAP_FEATUREID } from '../constants/actionConstants';
+
+import {zoomToGeoJson, getCategoryName, getNextLevelName, getPrevLevelName, get_matchEnd} from '../utils/helpers';
 
 var PropTypes = React.PropTypes;
 
 var MapContainer = React.createClass({
+  componentWillReceiveProps: function(nextProps) {
+    if(nextProps.layerInfo){
+
+      //get features from user location
+      const features = nextProps.layerInfo.features
+
+      // get map object from redux store
+      const leafletMap = this.props.leafletMap.leafletMap;
+
+      const level = this.getLevel();
+
+      //call to zoom to geojson (from helper library)
+      const layer = zoomToGeoJson(features,leafletMap,level);
+
+      //only zoom first time this is called otherwise this will force a rezoom everythome prop is changed
+    }
+  },
+  getLevel: function(){
+
+    if (this.props.geography_levels){
+      //filter the levels to get the active tab
+      const ActiveTabObject = this.props.geography_levels.filter( key =>{
+        return key.active === true;
+      })
+
+      //set default active tab - as Highest level
+      let activeTab = 'River Basins'
+      if (ActiveTabObject.length > 0){
+        //get the active tab and convert the name to the name used in the app.
+        //  this will eventually be driven by config or data....???
+        activeTab = getCategoryName(ActiveTabObject[0].geography_label);
+      }
+
+      return activeTab
+    }else{
+      return null
+    }
+  },
+  updateFilterState(level,value){
+
+    var nextLevel = getNextLevelName(level);
+
+    //set filter and active state for next level(s)
+    if(nextLevel){
+
+      //kind of hacky--how to do this in redux?
+      $('#search-select-'+nextLevel.replace(' ','_')).dropdown('set text','Choose a ' + nextLevel)
+
+      //recursive call to update all level filters
+      return this.updateFilterState(nextLevel,value)
+    } else{
+      return
+    }
+  },
+  updateFilterStateReverse(level,value){
+
+    var prevLevel = getPrevLevelName(level);
+
+    //set filter and active state for next level(s)
+    if(prevLevel){
+
+
+      const matchEnd = get_matchEnd(prevLevel);
+      if(value){
+        const selectedValue = value.substring(0,matchEnd)
+        //kind of hacky--how to do this in redux?
+        $('#search-select-'+prevLevel.replace(' ','_')).dropdown('set selected',selectedValue)
+
+        //get text	 TO COMPARE then if not matching make blank? or add text
+
+      }
+
+      //recursive call to update all level filters
+      return this.updateFilterStateReverse(prevLevel,value)
+    } else{
+      return
+    }
+  },
+
+
   handleMapLoad: function(e,self) {
     var map = this.refs.map.leafletElement;
     this.props.set_LeafletMap(map)
+
+    if(this.props.layerInfo){
+      const features = this.props.layerInfo.features
+      if (features){
+        if (features[0]){
+
+          const level = this.getLevel();
+          const value = features[0].properties.ID;
+
+          this.props.change_geographyLevelFilter(value,level)
+
+          this.updateFilterState(level,value);
+
+          this.updateFilterStateReverse(level,value);
+
+          //again kind of hacky
+          $('#search-select-'+level.replace(' ','_')).dropdown('set selected',value)
+        }
+
+      }
+    }
   },
   handleMapClick: function(e,self){
 
+    //get the leaftet map object
     var L = this.refs.map.leafletElement
-    //console.log(L)
-    // console.log(e)
-    // console.log(self)
-    // console.log(self.layer.feature.properties.ID)
-    // need to add redux stuff for re-sizeing?
 
-    console.log(self.latlng);
-    //sammple api call for getting data.
-    // http://services1.arcgis.com/PwLrOgCfU0cYShcG/ArcGIS/rest/services/RDRBP/FeatureServer/3/query?where=&objectIds=&time=&geometry=%7Bx%3A+-79.090576171875%2C+y%3A+34.77771580360469%7D&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&resultType=standard&distance=&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&returnCentroid=false&multipatchOption=&maxAllowableOffset=&geometryPrecision=&outSR=&returnIdsOnly=false&returnCountOnly=false&returnExtentOnly=false&returnDistinctValues=true&orderByFields=&groupByFieldsForStatistics=&outStatistics=&resultOffset=&resultRecordCount=&returnZ=false&returnM=false&quantizationParameters=&sqlFormat=none&f=html&token=
+    //check if charts are visible.
     const isVisible = this.props.charts.chart_visibility;
 
+    //update map height
     this.props.update_MapHeight();
 
-    //this.updateFilterState('Cataloging Units',self.layer.feature.properties.ID);
+    //get the attributes of the huc12 layer on a user click
+    this.props.get_LayerInfo_ByPoint(self.latlng.lat, self.latlng.lng, HUC12_MAP_FEATUREID);
 
-    //this.props.get_ChartData(self.layer.feature.properties.ID,'HUC12')
-    //this.props.change_geographyLevelFilter(self.layer.feature.properties.ID,'HUC12')
+    //set current geography level in redux state store
+    this.props.change_geographyLevelActive("HUC12");
 
-    //update chart visibility on map click...
+    //update chart visibility on map click on if the visibility is false
     if(!isVisible){
       this.props.update_ChartVisiblity();
     }
@@ -68,31 +169,26 @@ var MapContainer = React.createClass({
           url={this.state.tileUrl}
           onLeafletLoad={this.handleMapLoad.bind(null,this)}
         />
-      <ESRIFeatureLayer
-        url='https://services1.arcgis.com/PwLrOgCfU0cYShcG/ArcGIS/rest/services/RDRBP/FeatureServer/5'
-        layerStyle='{"color":"#696969","fillColor":"#DCDCDC","fillOpacity":0,"weight":8}'
-        zoom={this.props.zoom}
-        onLeafletClick={this.handleMapClick.bind(null,this)}
-        setMapLayers={this.props.set_MapLayers}
-        name="River Basins"
-      />
-      <ESRIFeatureLayer
-        url='https://services1.arcgis.com/PwLrOgCfU0cYShcG/ArcGIS/rest/services/RDRBP/FeatureServer/4'
-        layerStyle='{"color":"#808080","fillColor":"#DCDCDC","fillOpacity":0,"weight":6}'
-        zoom={this.props.zoom}
-        onLeafletClick={this.handleMapClick.bind(null,this)}
-        setMapLayers={this.props.set_MapLayers}
-        name="Cataloging Units"
-      />
-      <ESRIFeatureLayer
-        url='https://services1.arcgis.com/PwLrOgCfU0cYShcG/ArcGIS/rest/services/RDRBP/FeatureServer/3'
-        layerStyle='{"color":"#C0C0C0","fillColor":"#DCDCDC","fillOpacity":0,"weight":2}'
-        zoom={this.props.zoom}
-        min_zoom="9"
-        onLeafletClick={this.handleMapClick.bind(null,this)}
-        setMapLayers={this.props.set_MapLayers}
-        name="HUC 12"
-      />
+      <ESRITileMapLayer
+       url="http://tiles.arcgis.com/tiles/PwLrOgCfU0cYShcG/arcgis/rest/services/huc12/MapServer"
+       setMapLayers={this.props.set_MapLayers}
+       name="HUC 12"
+       min_zoom="9"
+       onLeafletClick={this.handleMapClick.bind(null,this)}
+       />
+      <ESRITileMapLayer
+       url="http://tiles.arcgis.com/tiles/PwLrOgCfU0cYShcG/arcgis/rest/services/huc8/MapServer"
+       setMapLayers={this.props.set_MapLayers}
+       name="Cataloging Units"
+       onLeafletClick={this.handleMapClick.bind(null,this)}
+       />
+      <ESRITileMapLayer
+       url="http://tiles.arcgis.com/tiles/PwLrOgCfU0cYShcG/arcgis/rest/services/huc6/MapServer"
+       setMapLayers={this.props.set_MapLayers}
+       opacity="0.5"
+       name="River Basins"
+       onLeafletClick={this.handleMapClick.bind(null,this)}
+       />
     </ReactLeaflet.Map>
   }
 
